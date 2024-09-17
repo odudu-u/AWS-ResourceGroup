@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# A SCRIPT THAT WILL CREATE A RESOURCE GROUP IN AWS.
+
+setup() { 
+    # Install AWS CLI
+    sudo apt-get update
+    sudo apt-get install awscli -y
+    
+    # Configure AWS CLI
+    aws configure
+    echo "You're logged in."
+}
+
+# PRINT OUT 5 RECOMMENDED REGIONS
+print_out_regions() {
+    regions_array=($( aws ec2 describe-regions --query "Regions[].[RegionName]" --output text | head -n 5))
+    for i in "${regions_array[@]}"
+    do
+       echo "$i"
+    done
+}
+
+# CHOOSE A REGION
+check_region() {
+    local region_exists=false
+    while [[ "$region_exists" = false ]];  do
+        print_out_regions
+        read -p "Enter your region: " selected_region
+        for j in "${regions_array[@]}"
+        do
+            if [[ "$selected_region" == "$j" ]]; then
+                region_exists=true
+                echo "Region exists"
+                break
+            else
+                continue
+            fi
+        done
+    done
+}
+
+# CHECK IF RESOURCE GROUP EXISTS
+check_resource_group () {
+    while true; do
+        read -p "Enter a name for your resource group: " resource_group
+        existing_group=$(aws resource-groups get-group --group-name $resource_group --region $selected_region 2>/dev/null)
+        if [ -n "$existing_group" ]; then
+            echo "The group $resource_group exists in $selected_region, please provide another name..."
+        else
+            break
+        fi
+    done
+}
+
+# CREATE RESOURCE GROUP
+create_resource_group () {
+    echo "Creating resource group: $resource_group in $selected_region"
+    aws resource-groups create-group --name $resource_group --region $selected_region | grep GroupArn
+}
+
+# LIST RESOURCE GROUPS
+list_resource_groups() {
+    aws resource-groups list-groups --region $selected_region --query "GroupIdentifiers[*].GroupName" --output table
+}
+
+# MAIN FUNCTION
+setup
+check_region
+check_resource_group 
+create_resource_group
+list_resource_groups
